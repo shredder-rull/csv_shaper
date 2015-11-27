@@ -4,6 +4,7 @@
 .config
 .rvmrc
 .yardoc
+.idea
 Gemfile.lock
 InstalledFiles
 _yardoc

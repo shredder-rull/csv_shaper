@@ -52,7 +52,9 @@ module CsvShaper
     #
     # Returns an updated Array of Row objects
     def row(*args, &block)
-      @rows.push Row.new(*args, &block)
+      row = Row.new(*(args << {:shaper => self}))
+      @rows.push row
+      row.build &block
     end
 
     # Public: adds several rows to the CSV

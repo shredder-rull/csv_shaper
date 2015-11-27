@@ -20,16 +20,17 @@ module CsvShaper
   # csv.row @model, :name, :age, :location
   # ```
   class Row
-    attr_reader :model, :cells
+    attr_reader :model, :cells, :shaper
     
     def initialize(*args)
       @cells = ActiveSupport::OrderedHash.new
-
-      if args.one? && block_given?
+      options = args.last.is_a?(Hash) ? args.pop : {}
+      @shaper = options[:shaper] || options['shaper']
+      if args.one?
         @model = args.first
-        yield self, @model
-      elsif args.empty? && block_given?
-        yield self
+        yield self, @model if block_given?
+      elsif args.empty?
+        yield self if block_given?
       elsif args.length > 1
         @model = args.shift
         args.each { |col| cell(col) }
@@ -44,7 +45,9 @@ module CsvShaper
     #
     # Returns an Array of the Cells in this row
     def cells(*args)
-      args.each { |col| cell(col) }
+      args.each do |col|
+        col.is_a?(Hash) ? col.each{|k,v| cell({k => v})} : cell(col)
+      end
       @cells
     end
     
@@ -62,21 +65,39 @@ module CsvShaper
         raise ArgumentError, 'no args passed to #cell, you must pass at least a column name'
       end
       
-      column = args.first.to_sym
+      column = args.first
+      column, method = column.is_a?(Hash) ? [column.keys.first.to_sym, column.values.first.to_sym] : [column.to_sym, column.to_sym]
       
       if args.size == 2
         @cells[column] = args.last
       elsif args.size == 1
-        if @model && @model.respond_to?(column)
-          @cells[column] = @model.send(column)
+        if @model && @model.respond_to?(method)
+          @cells[column] = @model.send(method)
         else
-          raise ArgumentError, "##{column} is not a method on #{@model.class.to_s}, call `csv.cell #{column}, value` instead"
+          raise ArgumentError, "##{method} is not a method on #{@model.class.to_s}, call `csv.cell #{column}, value` instead"
         end
       else
         raise ArgumentError, 'you can pass a column or a column with a value to #cell'
       end
       
       @cells
+    end
+
+    def build
+      raise ArgumentError, 'you can pass a block to #build' unless block_given?
+      if @model
+        yield self, @model
+      else
+        yield self
+      end
+    end
+
+    def row(*args, &block)
+      shaper.row(*args, &block)
+    end
+
+    def rows(collection = nil, &block)
+      shaper.rows(collection, &block)
     end
   end
 end
